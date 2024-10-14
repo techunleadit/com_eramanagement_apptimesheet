@@ -11,6 +11,8 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -24,6 +26,8 @@ class MyApp extends StatelessWidget {
 }
 
 class SplashPage extends StatefulWidget {
+  const SplashPage({super.key});
+
   @override
   _SplashPageState createState() => _SplashPageState();
 }
@@ -295,8 +299,8 @@ class _QRCodePageState extends State<QRCodePage> {
   }
 
   Future<void> _submitCheckIn(String qrCodeData) async {
+    String idUser = qrCodeData.replaceAll(RegExp(r'[^0-9]'), '');
     final response = await http.post(
-      String idUser = qrCodeData.replaceAll(RegExp(r'[^0-9]'), '') ?? '';
       Uri.parse('https://apitimesheet.era-management.com/timesheet'),
       body: jsonEncode({
         'id_user': idUser,
@@ -316,7 +320,7 @@ class _QRCodePageState extends State<QRCodePage> {
   }
 
   Future<void> _submitCheckOut(String qrCodeData) async {
-    String idUser = qrCodeData.replaceAll(RegExp(r'[^0-9]'), '') ?? '';
+    String idUser = qrCodeData.replaceAll(RegExp(r'[^0-9]'), '');
     final response = await http.post(
       Uri.parse('https://apitimesheet.era-management.com/timesheet'),
       body: jsonEncode({
@@ -392,7 +396,7 @@ class _QRCodePageState extends State<QRCodePage> {
                 child: Text('Scansiona QR Code'),
               ),
               SizedBox(height: 20),
-              if (scanResult != null) ...[
+              if (scanResult != null) ...[                
                 Text('Risultato scansione: $scanResult'),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center, // Centro i bottoni
