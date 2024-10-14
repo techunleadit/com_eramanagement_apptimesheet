@@ -296,9 +296,10 @@ class _QRCodePageState extends State<QRCodePage> {
 
   Future<void> _submitCheckIn(String qrCodeData) async {
     final response = await http.post(
+      String idUser = qrCodeData.replaceAll(RegExp(r'[^0-9]'), '') ?? '';
       Uri.parse('https://apitimesheet.era-management.com/timesheet'),
       body: jsonEncode({
-        'id_user': qrCodeData,
+        'id_user': idUser,
         'activity': 'in',
       }),
       headers: {'Content-Type': 'application/json'},
@@ -315,10 +316,11 @@ class _QRCodePageState extends State<QRCodePage> {
   }
 
   Future<void> _submitCheckOut(String qrCodeData) async {
+    String idUser = qrCodeData.replaceAll(RegExp(r'[^0-9]'), '') ?? '';
     final response = await http.post(
       Uri.parse('https://apitimesheet.era-management.com/timesheet'),
       body: jsonEncode({
-        'id_user': qrCodeData,
+        'id_user': idUser,
         'activity': 'out',
       }),
       headers: {'Content-Type': 'application/json'},
