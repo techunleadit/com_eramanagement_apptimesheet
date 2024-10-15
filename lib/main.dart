@@ -396,7 +396,7 @@ class _QRCodePageState extends State<QRCodePage> {
                 child: Text('Scansiona QR Code'),
               ),
               SizedBox(height: 20),
-              if (scanResult != null) ...[
+              if (scanResult != null) ...[                
                 Text('Risultato scansione: $scanResult'),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center, // Centro i bottoni
