@@ -43,16 +43,17 @@ class _SplashPageState extends State<SplashPage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? selectedCompany = prefs.getString('selectedCompany');
     String? userEmail = prefs.getString('userEmail');
+    String? deviceName = prefs.getString('deviceName'); // Recupera il deviceName
 
     // Simulate a delay to show the loading bar
     await Future.delayed(Duration(seconds: 2));
 
-    if (selectedCompany != null && userEmail != null) {
+    if (selectedCompany != null && userEmail != null && deviceName != null) {
       // If the company and email are selected, go directly to the QRCode screen
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => QRCodePage(companyName: selectedCompany, userEmail: userEmail),
+          builder: (context) => QRCodePage(companyName: selectedCompany, userEmail: userEmail,deviceName: deviceName,),
         ),
       );
     } else {
@@ -100,6 +101,7 @@ class _LoginPageState extends State<LoginPage> {
     final email = emailController.text;
     final password = passwordController.text;
 
+    // Effettua il login, ma non inviare il deviceName alle API
     final response = await http.post(
       Uri.parse('https://apitimesheet.era-management.com/login'),
       body: jsonEncode({
@@ -111,7 +113,11 @@ class _LoginPageState extends State<LoginPage> {
 
     if (response.statusCode == 200) {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString('userEmail', email); // Save email
+      await prefs.setString('userEmail', email); // Salva l'email
+
+      // Recupera il deviceName dalle preferenze se esiste, altrimenti lascia il campo vuoto
+      String? deviceName = prefs.getString('deviceName') ?? ''; // Se non trovato, restituisce una stringa vuota
+
       String? selectedCompany = prefs.getString('selectedCompany');
 
       if (selectedCompany == null) {
@@ -123,7 +129,12 @@ class _LoginPageState extends State<LoginPage> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-              builder: (context) => QRCodePage(companyName: selectedCompany, userEmail: email)),
+            builder: (context) => QRCodePage(
+              companyName: selectedCompany,
+              userEmail: email,
+              deviceName: deviceName, // Passa il deviceName
+            ),
+          ),
         );
       }
     } else {
@@ -164,6 +175,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
+
 class SettingsPage extends StatefulWidget {
   final String userEmail;
 
@@ -176,10 +188,10 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   String? selectedCompany;
   List<Map<String, dynamic>> companies = [];
+  final TextEditingController deviceNameController = TextEditingController();
 
   Future<void> _loadCompanies() async {
-    final response =
-        await http.get(Uri.parse('https://apitimesheet.era-management.com/companies'));
+    final response = await http.get(Uri.parse('https://apitimesheet.era-management.com/companies'));
 
     if (response.statusCode == 200) {
       setState(() {
@@ -187,31 +199,44 @@ class _SettingsPageState extends State<SettingsPage> {
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Errore caricamento ditte')));
+        SnackBar(content: Text('Errore caricamento ditte')),
+      );
     }
   }
 
   Future<void> _saveSettings() async {
-    if (selectedCompany != null) {
+    if (selectedCompany != null && deviceNameController.text.isNotEmpty) {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String companyName = companies
           .firstWhere((company) => company['id'].toString() == selectedCompany)['name'];
+      String deviceName = deviceNameController.text;  // Ottieni il nome del dispositivo inserito
+
+      // Salva impostazioni localmente
       await prefs.setString('selectedCompany', companyName);
-      
+      await prefs.setString('deviceName', deviceName);
+
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => QRCodePage(companyName: companyName, userEmail: widget.userEmail)),
+        MaterialPageRoute(
+          builder: (context) => QRCodePage(
+            companyName: companyName,
+            userEmail: widget.userEmail,
+            deviceName: deviceName,  // Passa il nome del dispositivo
+          ),
+        ),
       );
     } else {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Seleziona una ditta')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Compila tutti i campi')),
+      );
     }
   }
 
   Future<void> _logout() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.remove('selectedCompany');
-    await prefs.remove('userEmail'); // Remove email
+    await prefs.remove('userEmail');
+    await prefs.remove('deviceName');  // Rimuovi anche deviceName dalle preferenze
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => LoginPage()),
@@ -222,53 +247,75 @@ class _SettingsPageState extends State<SettingsPage> {
   void initState() {
     super.initState();
     _loadCompanies();
+
+    // Recupera il deviceName dalle preferenze se esiste
+    SharedPreferences.getInstance().then((prefs) {
+      String? deviceName = prefs.getString('deviceName');
+      if (deviceName != null && deviceName.isNotEmpty) {
+        deviceNameController.text = deviceName;  // Pre-popolato con il nome salvato
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Settings'), centerTitle: true), // Centro il titolo dell'AppBar
-      body: Center( // Utilizzo di Center per centrare tutto
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Utente collegato: ${widget.userEmail}'), // Show connected user email
-            DropdownButton<String>(
-              value: selectedCompany,
-              hint: Text('Seleziona la tua ditta'),
-              onChanged: (newValue) {
-                setState(() {
-                  selectedCompany = newValue;
-                });
-              },
-              items: companies.map((company) {
-                return DropdownMenuItem(
-                  child: Text(company['name']),
-                  value: company['id'].toString(),
-                );
-              }).toList(),
-            ),
-            ElevatedButton(
-              onPressed: _saveSettings,
-              child: Text('Salva'),
-            ),
-            SizedBox(height: 20), // Space between buttons
-            ElevatedButton(
-              onPressed: _logout,
-              child: Text('Disconnetti'),
-            ),
-          ],
+      appBar: AppBar(title: Text('Settings'), centerTitle: true),
+      body: Center(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Utente collegato: ${widget.userEmail}'),
+              DropdownButton<String>(
+                value: selectedCompany,
+                hint: Text('Seleziona la tua ditta'),
+                onChanged: (newValue) {
+                  setState(() {
+                    selectedCompany = newValue;
+                  });
+                },
+                items: companies.map((company) {
+                  return DropdownMenuItem(
+                    child: Text(company['name']),
+                    value: company['id'].toString(),
+                  );
+                }).toList(),
+              ),
+              SizedBox(height: 20),
+              TextField(
+                controller: deviceNameController,
+                decoration: InputDecoration(
+                  labelText: 'Nome dispositivo',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _saveSettings,
+                child: Text('Salva'),
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _logout,
+                child: Text('Disconnetti'),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
+
+
 class QRCodePage extends StatefulWidget {
   final String companyName;
   final String userEmail; // Add email as a parameter
+  final String deviceName;
 
-  QRCodePage({required this.companyName, required this.userEmail});
+  QRCodePage({required this.companyName, required this.userEmail,  required this.deviceName});
 
   @override
   _QRCodePageState createState() => _QRCodePageState();
@@ -305,6 +352,7 @@ class _QRCodePageState extends State<QRCodePage> {
       body: jsonEncode({
         'id_user': idUser,
         'activity': 'in',
+        'device_name': widget.deviceName,  // Aggiungi deviceName qui
       }),
       headers: {'Content-Type': 'application/json'},
     );
@@ -326,6 +374,7 @@ class _QRCodePageState extends State<QRCodePage> {
       body: jsonEncode({
         'id_user': idUser,
         'activity': 'out',
+        'device_name': widget.deviceName,  // Aggiungi deviceName qui
       }),
       headers: {'Content-Type': 'application/json'},
     );
@@ -389,6 +438,7 @@ class _QRCodePageState extends State<QRCodePage> {
             children: [
               Text('Ditta: ${widget.companyName}'), // Display selected company
               Text('Utente: ${widget.userEmail}'), // Display user email
+              Text('Dispositivo: ${widget.deviceName}'), // Display device name
               Text('Data e ora corrente: $currentDateTime'), // Show current time
               SizedBox(height: 20),
               ElevatedButton(
@@ -419,5 +469,4 @@ class _QRCodePageState extends State<QRCodePage> {
       ),
     );
   }
-
 }
